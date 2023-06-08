@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>MARA Alert Map</title>
+<meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+<!--Mapbox-->
+<script src='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js'></script>
+<link href='https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css' rel='stylesheet' />
+<style>
+body { 
+    margin: 0; 
+    padding: 0; 
+}
+#map { 
+    position: absolute; 
+    top: 0; 
+    bottom: 0; 
+    width: 100%; 
+}
+</style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<script>
+mapboxgl.accessToken = 'pk.eyJ1IjoibWFyYS1hZG1pbiIsImEiOiJjbGQ5djVhc3QwOW03M25ucHZzeG92Z2kwIn0.TWD6NPNUnQ4CemIKMCKEpg';
+
+// Define the incident colors based on incident type
+const incidentColors = {
+      'Piracy': '#F82B60',
+      'Sighting': '#FF6F2C',
+      'Smuggling': '#20C933',
+      'Suspicious Approach': '#FF6F2C',
+    };
+
+    // Get incident type and coordinates from URL search parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const incidentType = urlParams.get('type');
+    const incidentCoordinates = urlParams.get('coordinates').split(',').map(parseFloat);
+
+    // Create a new map instance
+    var map = new mapboxgl.Map({
+      container: 'map',
+      style: 'mapbox://styles/mapbox/streets-v11', // Specify the map style
+      center: incidentCoordinates, // Use incident coordinates as the map center
+      zoom: 12 // Set the zoom level
+    });
+
+    // Define the pulsing dot icon properties
+    const size = 100;
+    const pulsingDot = {
+      width: size,
+      height: size,
+      data: new Uint8Array(size * size * 4),
+
+      // When the layer is added to the map,
+      // get the rendering context for the map canvas.
+      onAdd: function () {
+        const canvas = document.createElement('canvas');
+        canvas.width = this.width;
+        canvas.height = this.height;
+        this.context = canvas.getContext('2d');
+      },
+
+      // Call once before every frame where the icon will be used.
+      render: function () {
+        const duration = 1000;
+        const t = (performance.now() % duration) / duration;
+
+        const radius = (size / 2) * 0.3;
+        const outerRadius = (size / 2) * 0.7 * t + radius;
+        const context = this.context;
+
+        // Draw the outer circle.
+        context.clearRect(0, 0, this.width, this.height);
+        context.beginPath();
+        context.arc(
+          this.width / 2,
+          this.height / 2,
+          outerRadius,
+          0,
+          Math.PI * 2
+        );
+        context.fillStyle = `rgba(${incidentColors[incidentType] || '255, 200, 200'}, ${1 - t})`;
+        context.fill();
+
+        // Draw the inner circle.
+        context.beginPath();
+        context.arc(
+          this.width / 2,
+          this.height / 2,
+          radius,
+          0,
+          Math.PI * 2
+        );
+        context.fillStyle = incidentColors[incidentType] || 'rgba(255, 100, 100, 1)';
+        context.strokeStyle = 'white';
+        context.lineWidth = 2 + 4 * (1 - t);
+        context.fill();
+        context.stroke();
+
+        // Update this image's data with data from the canvas.
+        this.data = context.getImageData(
+          0,
+          0,
+          this.width,
+          this.height
+        ).data;
+
+        // Continuously repaint the map, resulting
+        // in the smooth animation of the dot.
+        map.triggerRepaint();
+
+        // Return `true` to let the map know that the image was updated.
+        return true;
+      }
+    };
+
+    // Wait for the map to load
+    map.on('load', function () {
+      // Add the pulsing dot image to the map
+      map.addImage('pulsing-dot', pulsingDot, { pixelRatio: 2 });
+
+      // Add a source and layer for the pulsing dot
+      map.addSource('dot-point', {
+        'type': 'geojson',
+        'data': {
+          'type': 'FeatureCollection',
+          'features': [
+            {
+              'type': 'Feature',
+              'geometry': {
+                'type': 'Point',
+                'coordinates': incidentCoordinates
+              },
+              'properties': {
+                'incidentType': incidentType
+              }
+            }
+          ]
+        }
+      });
+
+      map.addLayer({
+        'id': 'layer-with-pulsing-dot',
+        'type': 'symbol',
+        'source': 'dot-point',
+        'layout': {
+          'icon-image': 'pulsing-dot',
+          'icon-allow-overlap': true
+        }
+      });
+    });
+
+document.querySelector(".mapboxgl-ctrl-attrib-inner").remove();
+document.querySelector(".mapboxgl-ctrl-bottom-left").remove();
+</script>
+
+</body>
+</html>
