@@ -55,7 +55,7 @@ const incidentColors = {
     // Get incident type and coordinates from URL search parameters
     const urlParams = new URLSearchParams(window.location.search);
     const incidentType = urlParams.get('type');
-    const incidentCoordinates = urlParams.get('coordinates').split('-').map(parseFloat);
+    const incidentCoordinates = urlParams.get('coordinates').split(',').map(parseFloat);
 
     // Create a new map instance
     var map = new mapboxgl.Map({
